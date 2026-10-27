@@ -268,7 +268,7 @@ const WindowsInformationIterator = struct {
         const result = SetupDiGetDeviceRegistryPropertyA(
             device_info_set.*,
             device_info_data,
-            @intFromEnum(property),
+            @backingInt(property),
             &data_type,
             property_str,
             std.os.windows.NAME_MAX,
@@ -682,7 +682,7 @@ const DarwinPortIterator = struct {
 
     pub fn next(self: *Self) !?SerialPortDescription {
         while (true) {
-            if (try self.iterator.next()) |entry| {
+            if (try self.iterator.next(self.io)) |entry| {
                 if (!std.mem.startsWith(u8, entry.name, "cu.")) {
                     continue;
                 } else {
@@ -766,9 +766,9 @@ pub const SerialConfig = struct {
     pub fn format(self: Self, writer: *Io.Writer) !void {
         return writer.print("{d}@{d}{c}{d}{s}", .{
             self.baud_rate,
-            @intFromEnum(self.word_size),
-            @intFromEnum(self.parity),
-            @intFromEnum(self.stop_bits),
+            @backingInt(self.word_size),
+            @backingInt(self.parity),
+            @backingInt(self.stop_bits),
             switch (self.handshake) {
                 .none => "",
                 .hardware => " RTS/CTS",
@@ -844,14 +844,14 @@ pub fn configureSerialPort(port: std.Io.File, config: SerialConfig) !void {
             const baudmask: std.c.speed_t = switch (tag) {
                 .macos => mapBaudToMacOSEnum(config.baud_rate) orelse b: {
                     macos_nonstandard_baud = true;
-                    break :b @enumFromInt(@as(u64, @bitCast(settings.cflag)));
+                    break :b @fromBackingInt(@intCast(@as(u64, @bitCast(settings.cflag))));
                 },
                 .linux => try mapBaudToLinuxEnum(config.baud_rate),
                 else => unreachable,
             };
 
             // initialize CFLAG with the baudrate bits
-            settings.cflag = @bitCast(@intFromEnum(baudmask));
+            settings.cflag = @bitCast(@backingInt(baudmask));
             settings.cflag.PARODD = config.parity == .odd or config.parity == .mark;
             settings.cflag.PARENB = config.parity != .none;
             settings.cflag.CLOCAL = config.handshake == .none;
